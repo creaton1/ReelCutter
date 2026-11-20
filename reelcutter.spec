@@ -26,6 +26,8 @@ hiddenimports = [
     'dotenv',
     'PIL',
     'PIL._tkinter_finder',
+    'PIL.ImageTk',
+    'cv2',
     'urllib',
     'urllib.request',
     'urllib.error',
