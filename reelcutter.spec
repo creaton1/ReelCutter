@@ -26,6 +26,10 @@ hiddenimports = [
     'dotenv',
     'PIL',
     'PIL._tkinter_finder',
+    'urllib',
+    'urllib.request',
+    'urllib.error',
+    'urllib.parse',
 ]
 
 datas = [
@@ -35,7 +39,7 @@ datas = [
 
 excludes = [
     'tkinter.test', 'unittest', 'pdb', 'doctest', 'argparse',
-    'html', 'xml', 'email', 'http', 'urllib', 'json', 'csv',
+    'html', 'xml', 'email', 'http', 'json', 'csv',
     'sqlite3', 'multiprocessing', 'logging',
 ]
 
