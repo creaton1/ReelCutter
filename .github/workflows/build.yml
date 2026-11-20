@@ -34,7 +34,7 @@ jobs:
           python --version
           pip --version
           ffmpeg -version | Select-Object -First 1
-          ls -la
+          Get-ChildItem
 
       - name: Install dependencies
         run: |
@@ -69,17 +69,17 @@ jobs:
               Write-Warning "Failed to download Vosk EN: $_"
             }
           }
-          ls -la reelcutter\models\vosk\
+          Get-ChildItem reelcutter\models\vosk\
 
       - name: Create icon
         run: |
           python create_icon.py
-          ls -la reelcutter\assets\
+          Get-ChildItem reelcutter\assets\
 
       - name: Build with PyInstaller
         run: |
           python -m PyInstaller reelcutter.spec --clean --noconfirm
-          ls -la dist/
+          Get-ChildItem dist/
 
       - name: Verify exe
         run: |
