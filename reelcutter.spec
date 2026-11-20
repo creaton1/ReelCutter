@@ -36,7 +36,7 @@ datas = [
 excludes = [
     'tkinter.test', 'unittest', 'pdb', 'doctest', 'argparse',
     'html', 'xml', 'email', 'http', 'urllib', 'json', 'csv',
-    'sqlite3', 'multiprocessing', 'threading', 'logging',
+    'sqlite3', 'multiprocessing', 'logging',
 ]
 
 a = Analysis(
