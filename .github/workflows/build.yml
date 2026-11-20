@@ -3,7 +3,7 @@ name: Build ReelCutter
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:  # ручной запуск из UI
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,13 +20,11 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'  # стабильная версия с колесами
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v2
-        with:
-          version: 'latest'
 
       - name: Install dependencies
         run: |
@@ -34,6 +32,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Download Vosk models
+        shell: pwsh
         run: |
           $modelsDir = "reelcutter\models\vosk"
           New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
@@ -61,6 +60,7 @@ jobs:
         run: python -m PyInstaller reelcutter.spec --clean --noconfirm
 
       - name: Verify exe
+        shell: pwsh
         run: |
           $exe = "dist\ReelCutter.exe"
           if (Test-Path $exe) {
