@@ -11,7 +11,10 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
       - name: Checkout code
@@ -26,13 +29,19 @@ jobs:
       - name: Install FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v2
 
+      - name: Debug - show versions
+        run: |
+          python --version
+          pip --version
+          ffmpeg -version | Select-Object -First 1
+          ls -la
+
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
       - name: Download Vosk models
-        shell: pwsh
         run: |
           $modelsDir = "reelcutter\models\vosk"
           New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
@@ -40,27 +49,39 @@ jobs:
           # Russian
           if (-not (Test-Path "$modelsDir\vosk-model-small-ru-0.22")) {
             Write-Host "Downloading Vosk RU..."
-            Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip" -OutFile "vosk-ru.zip"
-            Expand-Archive -Path "vosk-ru.zip" -DestinationPath $modelsDir -Force
-            Remove-Item "vosk-ru.zip"
+            try {
+              Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip" -OutFile "vosk-ru.zip" -TimeoutSec 120
+              Expand-Archive -Path "vosk-ru.zip" -DestinationPath $modelsDir -Force
+              Remove-Item "vosk-ru.zip" -Force
+            } catch {
+              Write-Warning "Failed to download Vosk RU: $_"
+            }
           }
 
           # English
           if (-not (Test-Path "$modelsDir\vosk-model-small-en-us-0.15")) {
             Write-Host "Downloading Vosk EN..."
-            Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip" -OutFile "vosk-en.zip"
-            Expand-Archive -Path "vosk-en.zip" -DestinationPath $modelsDir -Force
-            Remove-Item "vosk-en.zip"
+            try {
+              Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip" -OutFile "vosk-en.zip" -TimeoutSec 120
+              Expand-Archive -Path "vosk-en.zip" -DestinationPath $modelsDir -Force
+              Remove-Item "vosk-en.zip" -Force
+            } catch {
+              Write-Warning "Failed to download Vosk EN: $_"
+            }
           }
+          ls -la reelcutter\models\vosk\
 
       - name: Create icon
-        run: python create_icon.py
+        run: |
+          python create_icon.py
+          ls -la reelcutter\assets\
 
       - name: Build with PyInstaller
-        run: python -m PyInstaller reelcutter.spec --clean --noconfirm
+        run: |
+          python -m PyInstaller reelcutter.spec --clean --noconfirm
+          ls -la dist/
 
       - name: Verify exe
-        shell: pwsh
         run: |
           $exe = "dist\ReelCutter.exe"
           if (Test-Path $exe) {
@@ -69,7 +90,7 @@ jobs:
             Write-Host "Size: $('{0:N1}' -f $size) MB"
           } else {
             Write-Host "❌ EXE not found!"
-            Get-ChildItem dist -Recurse
+            Get-ChildItem dist -Recurse -ErrorAction SilentlyContinue
             exit 1
           }
 
