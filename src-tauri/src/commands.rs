@@ -11,7 +11,17 @@ pub fn init_app(db_path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn select_video() -> Result<Option<String>, String> {
-    Ok(None)
+    let path = rfd::FileDialog::new()
+        .add_filter("Видео", &["mp4", "mov", "mkv", "avi"])
+        .set_title("Выберите видео")
+        .pick_file()
+        .map(|p| p.to_string_lossy().to_string());
+    Ok(path)
+}
+
+#[tauri::command]
+pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -55,7 +65,7 @@ pub fn list_clips_cmd(project_id: String) -> Result<Vec<db::ClipSegment>, String
 }
 
 #[tauri::command]
-pub fn render_clips_cmd(
+pub async fn render_clips_cmd(
     project_id: String,
     source: String,
     clips: Vec<ClipSegment>,
@@ -64,17 +74,20 @@ pub fn render_clips_cmd(
     let job = db::create_render_job(&project_id).map_err(|e| e.to_string())?;
     let job_id = job.id.clone();
 
-    // Запускаем рендер в фоне (tokio)
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    // Рендер в фоне на рантайме Tauri (не создаём свой tokio::Runtime)
     let job_id_for_task = job_id.clone();
-    rt.spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let total = clips.len() as f64;
         let mut done = 0.0;
         let mut outputs: Vec<String> = Vec::new();
 
         for clip in &clips {
+            let preset = crate::core::types::PRESETS
+                .iter()
+                .find(|p| p.name == settings.preset)
+                .unwrap_or(&crate::core::types::PRESETS[1]);
             let out = format!("rendered_{}.mp4", Uuid::new_v4());
-            match crate::core::render_single_clip(&source, clip, &crate::core::types::PRESETS[1], &settings, &out) {
+            match crate::core::render_single_clip(&source, clip, preset, &settings, &out) {
                 Ok(_) => {
                     outputs.push(out.clone());
                     let mut c = clip.clone();

@@ -1,8 +1,38 @@
 import { FilePlus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useStore } from '../lib/store';
 
 export const VideoPreview = () => {
   const { sourcePath, videoInfo, isLoadingVideo, highlights } = useStore();
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
+  const prevUrlRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (prevUrlRef.current) {
+      URL.revokeObjectURL(prevUrlRef.current);
+      prevUrlRef.current = undefined;
+    }
+    if (!sourcePath) {
+      setPreviewUrl(undefined);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const bytes = await invoke<number[]>('read_file_bytes', { path: sourcePath });
+      if (cancelled) return;
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'video/mp4' }));
+      prevUrlRef.current = url;
+      setPreviewUrl(url);
+    })();
+    return () => {
+      cancelled = true;
+      if (prevUrlRef.current) {
+        URL.revokeObjectURL(prevUrlRef.current);
+        prevUrlRef.current = undefined;
+      }
+    };
+  }, [sourcePath]);
 
   return (
     <div className="flex flex-col gap-4 bg-surface-hover rounded-xl p-4 border border-slate-700/50 min-h-[300px]">
@@ -16,7 +46,7 @@ export const VideoPreview = () => {
       {sourcePath ? (
         <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
           <video
-            src={sourcePath}
+            src={previewUrl}
             className="w-full h-full object-cover"
             controls
           />

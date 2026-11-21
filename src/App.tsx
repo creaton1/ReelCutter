@@ -5,7 +5,7 @@ import { Timeline } from './components/Timeline';
 import { SettingsPanel } from './components/SettingsPanel';
 import { RenderQueue } from './components/RenderQueue';
 import { ImportButton } from './components/ImportButton';
-import { Plus, Monitor, Save } from 'lucide-react';
+import { Monitor, Save } from 'lucide-react';
 
 export default function App() {
   const { sourcePath, init } = useStore();
@@ -24,12 +24,7 @@ export default function App() {
           <span className="text-xl font-bold tracking-tight">ReelCutter</span>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-colors"
-          >
-            <ImportButton />
-            <Plus size={18} /> Импортировать видео
-          </button>
+          <ImportButton label="Импортировать видео" />
           {sourcePath && (
             <button className="px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-colors">
               <Save size={18} /> Сохранить проект

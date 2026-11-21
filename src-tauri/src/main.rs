@@ -16,6 +16,8 @@ fn main() {
             commands::render_clips_cmd,
             commands::list_render_jobs_cmd,
             commands::open_output_folder,
+            commands::select_video,
+            commands::read_file_bytes,
         ])
         .setup(|_app| {
             // Используем относительный путь к БД; в продакшене — через tauri::path resolver

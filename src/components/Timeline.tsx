@@ -29,7 +29,7 @@ export const Timeline = () => {
         <div className="flex gap-2">
           {highlights.map((h) => (
             <button
-              key={h.start}
+              key={`${h.start}-${h.end}`}
               onClick={() => addHighlight(h)}
               className="px-3 py-1.5 text-xs bg-surface hover:bg-surface-hover border border-accent/50 text-accent rounded transition-colors"
             >
