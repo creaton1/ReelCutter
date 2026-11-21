@@ -20,7 +20,7 @@ export const ImportButton = ({ label = 'Импортировать видео' }
   return (
     <button
       onClick={handleImport}
-      className="flex items-center gap-2 px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-colors"
+      className="flex items-center gap-2 px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-all active:scale-95"
     >
       <Plus size={18} />
       {label}

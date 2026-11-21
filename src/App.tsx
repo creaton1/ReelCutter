@@ -1,32 +1,70 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from './lib/store';
 import { VideoPreview } from './components/VideoPreview';
 import { Timeline } from './components/Timeline';
 import { SettingsPanel } from './components/SettingsPanel';
 import { RenderQueue } from './components/RenderQueue';
-import { ImportButton } from './components/ImportButton';
-import { Monitor, Save } from 'lucide-react';
+import { Monitor, Save, Play, Wand2, Film } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 export default function App() {
-  const { sourcePath, init } = useStore();
+  const { sourcePath, init, loadSource } = useStore();
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
-    // Инициализируем БД в директории приложения Tauri.
-    // Для демо используем относительный путь; в продакшене — tauri path resolver.
     init('./reelcutter.db');
   }, [init]);
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files.length) {
+      // Вебвью не даёт абсолютный путь к файлу — открываем системный диалог
+      const selected = await invoke<string | null>('select_video');
+      if (selected) await loadSource(selected);
+    }
+  };
+
+  const handleImportClick = async () => {
+    const selected = await invoke<string | null>('select_video');
+    if (selected) await loadSource(selected);
+  };
+
   return (
     <div className="min-h-screen bg-surface text-slate-200 p-4 md:p-6">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Monitor size={28} className="text-accent" />
-          <span className="text-xl font-bold tracking-tight">ReelCutter</span>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-accent-dim flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.4)]">
+            <Monitor size={24} className="text-surface" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-white">ReelCutter</h1>
+            <p className="text-xs text-muted">Вертикальные клипы из длинного видео</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <ImportButton label="Импортировать видео" />
+          <button
+            onClick={handleImportClick}
+            className="flex items-center gap-2 px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-all active:scale-95"
+          >
+            <Film size={18} />
+            <span className="hidden sm:inline">Импортировать видео</span>
+          </button>
           {sourcePath && (
-            <button className="px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-colors">
+            <button
+              className="btn-primary flex items-center gap-2"
+            >
               <Save size={18} /> Сохранить проект
             </button>
           )}
@@ -34,13 +72,36 @@ export default function App() {
       </header>
 
       {!sourcePath ? (
-        <div className="flex flex-col items-center justify-center h-[500px] text-center rounded-2xl bg-surface-hover border-2 border-dashed border-slate-700/50">
-          <Monitor size={64} className="mb-4 text-slate-600" />
-          <h2 className="text-lg font-semibold text-slate-300 mb-2">Резак вертикальных клипов</h2>
-          <p className="text-slate-500 max-w-sm mb-6">
-            Загрузите длинное видео — приложение найдёт яркие моменты, нарежет их в 9:16 с блюром
-            по бокам, добавит субтитры и экспортирует готовые Reels / Shorts / TikTok.
-          </p>
+        <div
+          className="glass-panel flex flex-col items-center justify-center min-h-[600px] text-center"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragging ? (
+            <div className="flex flex-col items-center gap-4 animate-pulse-slow">
+              <Wand2 size={48} className="text-accent animate-bounce" />
+              <span className="text-accent font-medium">Отпустите файл здесь</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <Monitor size={64} className="text-slate-600" />
+              <h2 className="text-lg font-semibold text-white mb-2">Резак вертикальных клипов</h2>
+              <p className="text-muted max-w-sm mb-6">
+                Загрузите длинное видео — приложение найдёт яркие моменты, нарежет их в 9:16 с блюром
+                по бокам, добавит субтитры и экспортирует готовые Reels / Shorts / TikTok.
+              </p>
+              <button
+                onClick={handleImportClick}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Play size={18} /> Выбрать видео
+              </button>
+              <p className="text-xs text-slate-500">
+                Поддерживаются MP4, MOV, MKV, AVI — или перетащите файл прямо сюда
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -51,9 +112,9 @@ export default function App() {
               onClick={() => {
                 // Анализ уже вызывается при загрузке; кнопка для повторного анализа
               }}
-              className="w-full py-2 bg-accent/10 hover:bg-accent/20 border border-accent/30 text-accent text-sm rounded transition-colors"
+              className="btn-accent w-full flex items-center justify-center gap-2"
             >
-              Повторный анализ моментов
+              <Wand2 size={16} /> Повторный анализ моментов
             </button>
           </div>
 

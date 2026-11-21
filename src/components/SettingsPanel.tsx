@@ -1,90 +1,131 @@
-import { Settings, Image } from 'lucide-react';
+import { Settings, Image, Music, Subtitles } from 'lucide-react';
 import { useStore } from '../lib/store';
 
 export const SettingsPanel = () => {
   const { settings, updateSettings } = useStore();
 
-  const presets = ['Reels', 'Shorts', 'TikTok', 'VK Clips'] as const;
+  const presets = [
+    { value: 'Reels', label: 'Instagram Reels', max: '90с' },
+    { value: 'Shorts', label: 'YouTube Shorts', max: '60с' },
+    { value: 'TikTok', label: 'TikTok', max: '60с' },
+    { value: 'VK Clips', label: 'VK Clips', max: '60с' },
+  ];
 
   return (
-    <div className="flex flex-col gap-4 bg-surface-hover rounded-xl p-4 border border-slate-700/50">
-      <div className="flex items-center gap-2">
+    <div className="glass-panel flex flex-col p-5 min-h-[420px] animate-fade-in">
+      <div className="flex items-center gap-3 mb-1">
         <Settings size={20} className="text-accent" />
-        <h3 className="font-semibold text-slate-300">Настройки рендера</h3>
+        <h3 className="font-semibold text-white">Настройки рендера</h3>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
+        {/* Платформа */}
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Платформа</label>
+          <label className="label-text">Платформа</label>
           <select
             value={settings.preset}
             onChange={(e) => updateSettings({ preset: e.target.value })}
-            className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 focus:ring-2 focus:ring-accent outline-none"
+            className="input-field"
           >
             {presets.map((p) => (
-              <option key={p} value={p}>
-                {p}
+              <option key={p.value} value={p.value}>
+                {p.label} ({p.max})
               </option>
             ))}
           </select>
+          <p className="text-xs text-muted mt-1">
+            Максимальная длительность клипа
+          </p>
         </div>
 
+        {/* Переключатели */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              id="subtitles"
-              type="checkbox"
-              checked={settings.subtitles}
-              onChange={(e) => updateSettings({ subtitles: e.target.checked })}
-              className="rounded bg-slate-800 border-slate-600 text-accent focus:ring-accent"
-            />
-            <label htmlFor="subtitles" className="text-sm text-slate-200">
-              Субтитры
-            </label>
+          <ToggleRow
+            label="Субтитры"
+            description="Авто-субтитры на клипах"
+            icon={<Subtitles size={16} />}
+            checked={settings.subtitles}
+            onChange={(e) => updateSettings({ subtitles: e.target.checked })}
+          />
+          <ToggleRow
+            label="Баннер / логотип"
+            description="Водяной знак на видео"
+            icon={<Image size={16} />}
+            checked={settings.banner}
+            onChange={(e) => updateSettings({ banner: e.target.checked })}
+          />
+        </div>
+
+        {/* Настройки субтитров */}
+        <div className="space-y-3">
+          <div>
+            <label className="label-text">Размер шрифта субтитров</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                value={settings.subtitle_size}
+                onChange={(e) => updateSettings({ subtitle_size: parseInt(e.target.value) || 24 })}
+                className="input-field w-24"
+              />
+              <span className="text-xs text-muted">px</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              id="banner"
-              type="checkbox"
-              checked={settings.banner}
-              onChange={(e) => updateSettings({ banner: e.target.checked })}
-              className="rounded bg-slate-800 border-slate-600 text-accent focus:ring-accent"
-            />
-            <label htmlFor="banner" className="text-sm text-slate-200">
-              Баннер / логотип
-            </label>
+          <div>
+            <label className="label-text">Громкость фоновой музыки</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={settings.music_volume}
+                onChange={(e) => updateSettings({ music_volume: parseFloat(e.target.value) })}
+                className="w-full accent-accent h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="text-xs font-mono text-muted">
+                {(settings.music_volume * 100).toFixed(0)}%
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Размер шрифта</label>
-            <input
-              type="number"
-              value={settings.subtitle_size}
-              onChange={(e) => updateSettings({ subtitle_size: parseInt(e.target.value) || 24 })}
-              className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-slate-200 focus:ring-2 focus:ring-accent outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Громкость музыки</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={settings.music_volume}
-              onChange={(e) => updateSettings({ music_volume: parseFloat(e.target.value) })}
-              className="w-full accent-accent"
-            />
-          </div>
-        </div>
-
-        <div className="pt-2 border-t border-slate-700/50 flex items-center gap-2 text-xs text-slate-400">
-          <Image size={14} />
-          <span>Баннер и музыка подключаются через системный выбор файлов в следующей итерации.</span>
+        <div className="pt-3 border-t border-slate-700/40 flex items-center gap-2 text-xs text-slate-500">
+          <Music size={14} className="opacity-50" />
+          <span>Баннер и музыка выбираются через системное окно файлов.</span>
         </div>
       </div>
     </div>
   );
 };
+
+function ToggleRow({
+  label,
+  description,
+  icon,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  icon: JSX.Element;
+  checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 p-3 bg-surface/30 rounded-lg border border-slate-700/40 hover:border-slate-600/60 transition-colors cursor-pointer">
+      {icon}
+      <div className="flex-1">
+        <div className="flex justify-between items-baseline">
+          <span className="text-sm text-white font-medium">{label}</span>
+        </div>
+        <p className="text-xs text-muted">{description}</p>
+      </div>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="rounded bg-slate-800 border-slate-600 text-accent focus:ring-accent"
+      />
+    </div>
+  );
+}

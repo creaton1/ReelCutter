@@ -1,68 +1,93 @@
-import { Play, RefreshCw, FolderOpen, AlertCircle } from 'lucide-react';
+import { Play, RefreshCw, FolderOpen, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 
 export const RenderQueue = () => {
   const { renderJobs, isRendering, renderProgress, renderCurrentProject, openOutputFolder } = useStore();
 
+  const doneJobs = renderJobs.filter((j) => j.status === 'done');
+  const errorJobs = renderJobs.filter((j) => j.status === 'error');
+
   return (
-    <div className="flex flex-col gap-4 bg-surface-hover rounded-xl p-4 border border-slate-700/50">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-300">Очередь рендера</h3>
+    <div className="glass-panel flex flex-col p-5 min-h-[420px] animate-slide-up">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-semibold text-white">Очередь рендера</h3>
         <button
           onClick={renderCurrentProject}
           disabled={isRendering}
-          className="flex items-center gap-2 px-3 py-1.5 bg-accent text-black font-medium rounded hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary flex items-center gap-2 px-3 py-1.5 text-xs"
         >
           {isRendering ? (
-            <span className="flex items-center gap-1"><RefreshCw size={16} className="animate-spin" /> Рендеринг…</span>
+            <span className="flex items-center gap-1.5"><RefreshCw size={14} className="animate-spin" /> Рендеринг…</span>
           ) : (
-            <span><Play size={16} /> Рендерить все клипы</span>
+            <span><Play size={14} /> Рендерить все клипы</span>
           )}
         </button>
       </div>
 
       {isRendering && (
-        <>
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+        <div className="mt-4 space-y-2">
+          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50">
             <div
-              className="h-full bg-accent transition-all duration-300"
+              className="h-full bg-gradient-to-r from-accent to-accent-dim transition-all duration-500"
               style={{ width: `${renderProgress}%` }}
             />
           </div>
-          <p className="text-xs text-slate-400 text-center">{renderProgress.toFixed(0)}%</p>
-        </>
+          <p className="text-xs font-mono text-center text-accent">
+            {renderProgress.toFixed(0)}% завершено
+          </p>
+        </div>
       )}
 
-      <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+      <div className="flex-1 space-y-2 overflow-y-auto pr-2">
         {renderJobs.length === 0 ? (
-          <div className="text-center text-slate-500 text-sm py-4">Заданий нет</div>
+          <div className="empty-state flex-1">
+            <RefreshCw size={32} className="mx-auto mb-3 opacity-20 text-slate-500" />
+            <p className="text-muted text-sm">Заданий нет</p>
+            <p className="text-xs text-slate-500">Сохраните клипы и нажмите «Рендерить»</p>
+          </div>
         ) : (
-          renderJobs.map((job) => (
-            <div key={job.id} className="flex items-center justify-between px-2 py-2 bg-slate-800/50 rounded">
-              <div className="flex-1">
-                <div className="text-sm text-slate-200">{job.id.slice(0, 8)}…</div>
-                <div className="text-xs text-slate-500">{job.status}</div>
+          <>
+            {doneJobs.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-success text-xs font-medium mb-2">
+                <CheckCircle2 size={14} />
+                <span>{doneJobs.length} готово</span>
               </div>
-              <div className="flex items-center gap-2">
-                {job.status === 'error' && (
-                  <AlertCircle
-                    size={16}
-                    className="text-red-400"
-                    aria-label={job.error ?? 'Ошибка'}
-                  />
-                )}
-                {job.output_path && (
+            )}
+            {errorJobs.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-danger/10 border border-danger/20 rounded-lg text-danger text-xs font-medium mb-2">
+                <AlertCircle size={14} />
+                <span>{errorJobs.length} с ошибкой</span>
+              </div>
+            )}
+            {renderJobs.map((job) => (
+              <div key={job.id} className="flex items-center justify-between px-3 py-2.5 bg-slate-800/40 rounded-lg border border-slate-700/40 transition-all">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs font-mono text-slate-300 truncate">
+                      {job.id.slice(0, 8)}…
+                    </div>
+                    <span
+                      className={`ml-auto px-2 py-0.5 rounded-full text-xs font-medium border ${job.status === 'done' ? 'border-success/30 bg-success/10 text-success' : job.status === 'error' ? 'border-danger/30 bg-danger/10 text-danger' : 'border-accent/30 bg-accent/10 text-accent'}`}
+                    >
+                      {job.status === 'done' ? 'Готово' : job.status === 'error' ? 'Ошибка' : 'В очереди'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {job.error ?? ''}
+                  </div>
+                </div>
+                {job.status === 'done' && job.output_path && (
                   <button
-                    onClick={() => openOutputFolder(job.output_path as string)}
-                    className="p-1 hover:bg-slate-700 rounded text-slate-400"
+                    onClick={() => openOutputFolder(job.output_path!)}
+                    className="p-1.5 text-muted hover:text-accent hover:bg-accent/10 rounded transition-colors"
                     title="Открыть папку"
                   >
-                    <FolderOpen size={16} />
+                    <FolderOpen size={14} />
                   </button>
                 )}
               </div>
-            </div>
-          ))
+            ))}
+          </>
         )}
       </div>
     </div>
