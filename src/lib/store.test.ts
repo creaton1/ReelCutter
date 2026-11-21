@@ -104,10 +104,9 @@ describe('useStore', () => {
     await useStore.getState().createNewProject('Проект', 'Shorts');
     await useStore.getState().saveCurrentClips();
     expect(mInvoke.saveClips).toHaveBeenCalled();
-    const [projId, saved] = mInvoke.saveClips.mock.calls[0];
-    expect(projId).toBe('p-1');
-    expect(saved[0].id).toBe('c1');
-    expect(saved[0].start).toBe(0);
+    expect(mInvoke.saveClips).toHaveBeenCalledWith('p-1', expect.arrayContaining([
+      expect.objectContaining({ id: 'c1', start: 0, end: 5 }),
+    ]));
   });
 
   it('renderCurrentProject rejects when no source video', async () => {
