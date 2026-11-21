@@ -11,7 +11,6 @@ from moviepy import (
     VideoFileClip, AudioFileClip, CompositeVideoClip, CompositeAudioClip,
     ImageClip, ColorClip, TextClip, vfx, afx
 )
-from moviepy.video.fx import Crop, Resize
 
 from .config import CONFIG, PLATFORMS
 from .highlight_detector import HighlightSegment

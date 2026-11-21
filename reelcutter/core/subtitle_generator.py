@@ -91,7 +91,7 @@ class SubtitleGenerator:
         SetLogLevel(-1)  # Отключаем логи Vosk
 
         # Выбираем модель
-        model_name = CONFIG.vosk_model_ru if language in ("auto", "ru") else CONFIG.vosk_model_en
+        model_name = CONFIG.vosk_model if language in ("auto", "ru") else CONFIG.vosk_model_en
         model_path = CONFIG.models_dir / "vosk" / model_name
 
         if not model_path.exists():

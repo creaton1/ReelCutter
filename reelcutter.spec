@@ -41,7 +41,7 @@ datas = [
 
 excludes = [
     'tkinter.test', 'unittest', 'pdb', 'doctest', 'argparse',
-    'html', 'xml', 'http', 'csv',
+    'html', 'xml', 'http',
     'sqlite3', 'multiprocessing',
 ]
 
