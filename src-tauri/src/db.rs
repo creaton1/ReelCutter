@@ -33,8 +33,7 @@ pub struct DbState {
 }
 
 fn db_file_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let path = get_db_path()
-        .ok_or_else(|| "db path not set".to_string())?;
+    let path = get_db_path().ok_or_else(|| "db path not set".to_string())?;
     let p = PathBuf::from(path);
     if let Some(parent) = p.parent() {
         fs::create_dir_all(parent)?;
@@ -62,7 +61,11 @@ fn save_state(state: &DbState) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn create_project(name: &str, source_path: &str, preset: &str) -> Result<Project, Box<dyn std::error::Error>> {
+pub fn create_project(
+    name: &str,
+    source_path: &str,
+    preset: &str,
+) -> Result<Project, Box<dyn std::error::Error>> {
     let mut state = load_state()?;
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
@@ -102,7 +105,11 @@ pub fn list_clips(project_id: &str) -> Result<Vec<ClipSegment>, Box<dyn std::err
         .filter(|c| c.project_id.as_deref() == Some(project_id))
         .cloned()
         .collect();
-    clips.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
+    clips.sort_by(|a, b| {
+        a.start
+            .partial_cmp(&b.start)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(clips)
 }
 

@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use reelcutter_core::commands;
+use tauri::WindowBuilder;
 
 fn main() {
     tauri::Builder::default()
@@ -16,10 +17,16 @@ fn main() {
             commands::render_clips_cmd,
             commands::list_render_jobs_cmd,
             commands::open_output_folder,
-            commands::select_video,
             commands::read_file_bytes,
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            WindowBuilder::new(app, "main")
+                .title("ReelCutter")
+                .inner_size(1200.0, 800.0)
+                .resizable(true)
+                .center()
+                .build()?;
+
             // Используем относительный путь к БД; в продакшене — через tauri::path resolver
             let db_path = std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from("."))

@@ -1,7 +1,10 @@
 pub mod analyzer;
+pub mod detect;
 pub mod ffmpeg;
+pub mod render;
 pub mod types;
 
+use crate::core::render::render_single_clip;
 use crate::core::types::*;
 use anyhow::{Context, Result};
 use rayon::prelude::*;
@@ -10,32 +13,47 @@ use rayon::prelude::*;
 pub fn probe_video(path: &str) -> Result<VideoInfo> {
     let output = std::process::Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,r_frame_rate,duration",
-            "-show_entries", "format=duration",
-            "-of", "json",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type,width,height,r_frame_rate,duration",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
             path,
         ])
         .output()
         .context("ffprobe не найден — установите FFmpeg и добавьте в PATH")?;
 
     if !output.status.success() {
-        anyhow::bail!("ffprobe завершился с ошибкой: {}", String::from_utf8_lossy(&output.stderr));
+        anyhow::bail!(
+            "ffprobe завершился с ошибкой: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .context("не удалось распарсить вывод ffprobe")?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("не удалось распарсить вывод ffprobe")?;
 
-    let duration = json["format"]["duration"]
-        .as_f64()
-        .or_else(|| json["streams"][0]["duration"].as_f64())
+    let duration = parse_duration(&json["format"]["duration"])
+        .or_else(|| {
+            json["streams"]
+                .as_array()
+                .and_then(|streams| streams.iter().find_map(|s| parse_duration(&s["duration"])))
+        })
         .unwrap_or(0.0);
 
-    let width = json["streams"][0]["width"].as_i64().unwrap_or(0) as i32;
-    let height = json["streams"][0]["height"].as_i64().unwrap_or(0) as i32;
+    let video_stream = json["streams"]
+        .as_array()
+        .and_then(|streams| streams.iter().find(|s| s["codec_type"] == "video"));
 
-    let fps_str = json["streams"][0]["r_frame_rate"].as_str().unwrap_or("0/1");
+    let width = video_stream.and_then(|s| s["width"].as_i64()).unwrap_or(0) as i32;
+    let height = video_stream.and_then(|s| s["height"].as_i64()).unwrap_or(0) as i32;
+
+    let fps_str = video_stream
+        .and_then(|s| s["r_frame_rate"].as_str())
+        .unwrap_or("0/1");
     let fps = parse_fps(fps_str);
 
     let has_audio = json["streams"]
@@ -50,6 +68,13 @@ pub fn probe_video(path: &str) -> Result<VideoInfo> {
         fps,
         has_audio,
     })
+}
+
+/// ffprobe отдаёт duration как строку ("15.000000"), а не как число.
+fn parse_duration(value: &serde_json::Value) -> Option<f64> {
+    value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|s| s.parse::<f64>().ok()))
 }
 
 fn parse_fps(s: &str) -> f64 {
@@ -72,9 +97,9 @@ pub fn detect_highlights(path: &str, max_duration: f64) -> Result<Vec<Highlight>
     }
 
     // Пики энергии аудио через ffmpeg astats
-    let audio_peaks = detect_audio_peaks(path)?;
+    let audio_peaks = detect::detect_audio_peaks(path)?;
     // Смены сцен
-    let scene_changes = detect_scene_changes(path)?;
+    let scene_changes = detect::detect_scene_changes(path)?;
 
     // Сливаем и ранжируем
     let mut candidates: Vec<(f64, f64, f64, String)> = Vec::new();
@@ -109,26 +134,12 @@ pub fn detect_highlights(path: &str, max_duration: f64) -> Result<Vec<Highlight>
         }
     }
 
-    highlights.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
+    highlights.sort_by(|a, b| {
+        a.start
+            .partial_cmp(&b.start)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(highlights)
-}
-
-fn detect_audio_peaks(_path: &str) -> Result<Vec<(f64, f64, f64)>> {
-    // Упрощённая заглушка: в реальности здесь парсинг ffmpeg astats/ebur128.
-    // Возвращаем равномерно распределённые candidates для демонстрации.
-    Ok(vec![
-        (10.0, 20.0, 0.9),
-        (45.0, 55.0, 0.85),
-        (90.0, 100.0, 0.8),
-    ])
-}
-
-fn detect_scene_changes(_path: &str) -> Result<Vec<(f64, f64, f64)>> {
-    // Заглушка scene detection. Реализация через ffmpeg select='gt(scene,0.3)'.
-    Ok(vec![
-        (30.0, 40.0, 0.75),
-        (70.0, 80.0, 0.7),
-    ])
 }
 
 /// Рендерит список клипов параллельно (Rayon). Каждый клип — отдельный вызов ffmpeg.
@@ -137,7 +148,10 @@ pub fn render_clips(
     clips: &[ClipSegment],
     settings: &RenderSettings,
 ) -> Result<Vec<String>> {
-    let preset = PRESETS.iter().find(|p| p.name == settings.preset).unwrap_or(&PRESETS[1]);
+    let preset = PRESETS
+        .iter()
+        .find(|p| p.name == settings.preset)
+        .unwrap_or(&PRESETS[1]);
 
     let outputs: Result<Vec<String>> = clips
         .par_iter()
@@ -149,50 +163,4 @@ pub fn render_clips(
         .collect();
 
     outputs
-}
-
-/// Рендерит один клип через ffmpeg (вертикальное 9:16 с блюром по бокам).
-pub(crate) fn render_single_clip(
-    source: &str,
-    clip: &ClipSegment,
-    preset: &PlatformPreset,
-    _settings: &RenderSettings,
-    output: &str,
-) -> Result<()> {
-    let duration = clip.end - clip.start;
-    let filter = build_vertical_filter(preset)?;
-    let mut cmd = std::process::Command::new("ffmpeg");
-    cmd.args([
-        "-y",
-        "-ss", &clip.start.to_string(),
-        "-i", source,
-        "-t", &duration.to_string(),
-        "-filter_complex", &filter,
-        "-map", "[out]",
-        "-map", "0:a?",
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        output,
-    ]);
-
-    let status = cmd.status().context("ffmpeg не запустился")?;
-    if !status.success() {
-        anyhow::bail!("ffmpeg ошибка при рендере клипа {}", clip.id);
-    }
-    Ok(())
-}
-
-fn build_vertical_filter(preset: &PlatformPreset) -> Result<String> {
-    // 9:16 с блюром по бокам и центрированием основного видео
-    let w = preset.width;
-    let h = preset.height;
-    Ok(format!(
-        "[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}[main];\
-         [0:v]scale={w}:{h}:force_original_aspect_ratio=decrease,boxblur=luma_radius=40:luma_power=1[bg];\
-         [bg][main]overlay=(W-w)/2:(H-h)/2[out]"
-    ))
 }

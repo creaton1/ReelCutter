@@ -1,6 +1,8 @@
 use crate::core::types::*;
 use crate::db;
 use anyhow::Result;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use uuid::Uuid;
 
 #[tauri::command]
@@ -40,7 +42,11 @@ pub fn detect_highlights(path: String, preset: String) -> Result<Vec<Highlight>,
 }
 
 #[tauri::command]
-pub fn create_project_cmd(name: String, source_path: String, preset: String) -> Result<db::Project, String> {
+pub fn create_project_cmd(
+    name: String,
+    source_path: String,
+    preset: String,
+) -> Result<db::Project, String> {
     db::create_project(&name, &source_path, &preset).map_err(|e| e.to_string())
 }
 
@@ -52,8 +58,10 @@ pub fn list_projects_cmd() -> Result<Vec<db::Project>, String> {
 #[tauri::command]
 pub fn save_clips_cmd(project_id: String, clips: Vec<ClipSegment>) -> Result<(), String> {
     for clip in clips {
-        let mut c = clip;
-        c.project_id = Some(project_id.clone());
+        let c = ClipSegment {
+            project_id: Some(project_id.clone()),
+            ..clip
+        };
         db::save_clip(&c).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -87,7 +95,7 @@ pub async fn render_clips_cmd(
                 .find(|p| p.name == settings.preset)
                 .unwrap_or(&crate::core::types::PRESETS[1]);
             let out = format!("rendered_{}.mp4", Uuid::new_v4());
-            match crate::core::render_single_clip(&source, clip, preset, &settings, &out) {
+            match crate::core::render::render_single_clip(&source, clip, preset, &settings, &out) {
                 Ok(_) => {
                     outputs.push(out.clone());
                     let mut c = clip.clone();
@@ -95,17 +103,39 @@ pub async fn render_clips_cmd(
                     let _ = db::save_clip(&c);
                     done += 1.0;
                     let prog = done / total * 100.0;
-                    let _ = db::update_render_job(&job_id_for_task, "rendering", prog, Some(&out), None);
+                    let _ = db::update_render_job(
+                        &job_id_for_task,
+                        "rendering",
+                        prog,
+                        Some(&out),
+                        None,
+                    );
                 }
                 Err(e) => {
-                    let _ = db::update_render_job(&job_id_for_task, "error", done / total * 100.0, None, Some(&e.to_string()));
+                    let _ = db::update_render_job(
+                        &job_id_for_task,
+                        "error",
+                        done / total * 100.0,
+                        None,
+                        Some(&e.to_string()),
+                    );
                     break;
                 }
             }
         }
 
-        let status = if outputs.len() == clips.len() { "done" } else { "error" };
-        let _ = db::update_render_job(&job_id_for_task, status, 100.0, outputs.last().map(|s| s.as_str()), None);
+        let status = if outputs.len() == clips.len() {
+            "done"
+        } else {
+            "error"
+        };
+        let _ = db::update_render_job(
+            &job_id_for_task,
+            status,
+            100.0,
+            outputs.last().map(|s| s.as_str()),
+            None,
+        );
     });
 
     Ok(job_id)
@@ -117,6 +147,21 @@ pub fn list_render_jobs_cmd(project_id: String) -> Result<Vec<db::RenderJob>, St
 }
 
 #[tauri::command]
-pub fn open_output_folder(_path: String) -> Result<(), String> {
-    Ok(())
+pub fn open_output_folder(path: String) -> Result<(), String> {
+    // Открываем папку в проводнике Windows. Если передан путь к файлу — открываем его родительскую папку.
+    let target = PathBuf::from(&path);
+    let folder = if target.is_file() {
+        target
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
+    } else {
+        target
+    };
+
+    Command::new("explorer")
+        .arg(&folder)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("не удалось открыть папку: {e}"))
 }
