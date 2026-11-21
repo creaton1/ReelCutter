@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.env
+
+# PyInstaller / builds
+build/
+dist/
+*.spec
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ReelCutter runtime
+temp/
+output/
+models/vosk/
+*.log
