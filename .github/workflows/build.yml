@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         shell: pwsh
@@ -20,85 +20,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
 
       - name: Install FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v2
 
-      - name: Debug - show versions
-        run: |
-          python --version
-          pip --version
-          ffmpeg -version | Select-Object -First 1
-          Get-ChildItem
+      - name: Install frontend dependencies
+        run: npm ci
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+      - name: Build frontend
+        run: npm run build
 
-      - name: Download Vosk models
-        run: |
-          $modelsDir = "reelcutter\models\vosk"
-          New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --release
 
-          # Russian
-          if (-not (Test-Path "$modelsDir\vosk-model-small-ru-0.22")) {
-            Write-Host "Downloading Vosk RU..."
-            try {
-              Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip" -OutFile "vosk-ru.zip" -TimeoutSec 120
-              Expand-Archive -Path "vosk-ru.zip" -DestinationPath $modelsDir -Force
-              Remove-Item "vosk-ru.zip" -Force
-            } catch {
-              Write-Warning "Failed to download Vosk RU: $_"
-            }
-          }
-
-          # English
-          if (-not (Test-Path "$modelsDir\vosk-model-small-en-us-0.15")) {
-            Write-Host "Downloading Vosk EN..."
-            try {
-              Invoke-WebRequest -Uri "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip" -OutFile "vosk-en.zip" -TimeoutSec 120
-              Expand-Archive -Path "vosk-en.zip" -DestinationPath $modelsDir -Force
-              Remove-Item "vosk-en.zip" -Force
-            } catch {
-              Write-Warning "Failed to download Vosk EN: $_"
-            }
-          }
-          Get-ChildItem reelcutter\models\vosk\
-
-      - name: Create icon
-        run: |
-          python create_icon.py
-          Get-ChildItem reelcutter\assets\
-
-      - name: Build with PyInstaller
-        run: |
-          python -m PyInstaller reelcutter.spec --clean --noconfirm
-          Get-ChildItem dist/
-
-      - name: Verify exe
-        run: |
-          $exe = "dist\ReelCutter.exe"
-          if (Test-Path $exe) {
-            Write-Host "✅ EXE built: $exe"
-            $size = (Get-Item $exe).Length / 1MB
-            Write-Host "Size: $('{0:N1}' -f $size) MB"
-          } else {
-            Write-Host "❌ EXE not found!"
-            Get-ChildItem dist -Recurse -ErrorAction SilentlyContinue
-            exit 1
-          }
-
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ReelCutter-windows
-          path: dist/ReelCutter.exe
+          path: src-tauri/target/release/bundle/**/*
           retention-days: 30
           compression-level: 6
 
@@ -106,7 +60,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/ReelCutter.exe
+          files: src-tauri/target/release/bundle/**/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
