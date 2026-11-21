@@ -158,10 +158,14 @@ class HighlightDetector:
         if not cap.isOpened():
             return segments
 
-        # Детектор лиц
-        face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+        # Детектор лиц (OpenCV 5 убрал Haar каскады — деградируем безопасно)
+        face_cascade = None
+        try:
+            face_cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            )
+        except Exception:
+            face_cascade = None
 
         prev_frame = None
         scene_changes = []
@@ -191,9 +195,10 @@ class HighlightDetector:
                             scene_changes.append(frame_idx / self.fps)
 
                     # 2. Детекция лиц
-                    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-                    if len(faces) > 0:
-                        face_frames.append(frame_idx / self.fps)
+                    if face_cascade is not None:
+                        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+                        if len(faces) > 0:
+                            face_frames.append(frame_idx / self.fps)
 
                     # 3. Оптический поток (движение)
                     if prev_frame is not None:

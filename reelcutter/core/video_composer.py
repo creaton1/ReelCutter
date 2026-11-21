@@ -1,5 +1,6 @@
 """Видео-композитор: вертикальный формат, блюр, музыка, сабы, рекламные баннеры"""
 import logging
+import os
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Literal
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
+from PIL import ImageFont
 from moviepy import (
     VideoFileClip, AudioFileClip, CompositeVideoClip, CompositeAudioClip,
     ImageClip, ColorClip, TextClip, vfx, afx
@@ -16,6 +18,27 @@ from .config import CONFIG, PLATFORMS
 from .highlight_detector import HighlightSegment
 
 logger = logging.getLogger(__name__)
+
+
+def _subtitle_font_path(font_size: int) -> str | None:
+    """Путь к шрифту для субтитров, доступному в системе.
+
+    Без этого TextClip падает с ValueError, если запрошенный шрифт
+    (например, bare 'Arial') не найден Pillow.
+    """
+    candidates = [
+        "arial.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for path in candidates:
+        try:
+            ImageFont.truetype(path, font_size)
+            return path
+        except Exception:
+            continue
+    return None
 
 
 @dataclass
@@ -140,9 +163,14 @@ class VideoComposer:
     def _smart_crop_vertical(self, clip: VideoFileClip) -> VideoFileClip:
         """Умный вертикальный кроп с детекцией лиц"""
         # Анализируем несколько кадров для поиска зоны интереса
-        face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+        # OpenCV 5 убрал Haar каскады — деградируем к центру кадра
+        face_cascade = None
+        try:
+            face_cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            )
+        except Exception:
+            face_cascade = None
 
         sample_times = np.linspace(0, clip.duration, min(10, int(clip.duration)))
         face_regions = []
@@ -150,12 +178,13 @@ class VideoComposer:
         for t in sample_times:
             frame = clip.get_frame(t)
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-            for (x, y, fw, fh) in faces:
-                # Центр лица в относительных координатах
-                cx = (x + fw/2) / frame.shape[1]
-                cy = (y + fh/2) / frame.shape[0]
-                face_regions.append((cx, cy))
+            if face_cascade is not None:
+                faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+                for (x, y, fw, fh) in faces:
+                    # Центр лица в относительных координатах
+                    cx = (x + fw/2) / frame.shape[1]
+                    cy = (y + fh/2) / frame.shape[0]
+                    face_regions.append((cx, cy))
 
         if face_regions:
             # Средний центр лиц
@@ -246,12 +275,14 @@ class VideoComposer:
             return clip
 
         # Создаем ASS файл для красивых субтитров
+        # Закрываем дескриптор временного файла перед записью, иначе на Windows
+        # save_ass не сможет открыть тот же путь на запись (PermissionError).
         from .subtitle_generator import SubtitleGenerator
         gen = SubtitleGenerator()
 
-        with tempfile.NamedTemporaryFile(suffix=".ass", delete=False, mode='w', encoding='utf-8') as f:
-            ass_path = f.name
-            gen.save_ass(relevant, Path(ass_path))
+        ass_fd, ass_path = tempfile.mkstemp(suffix=".ass")
+        os.close(ass_fd)
+        gen.save_ass(relevant, Path(ass_path))
 
         # Накладываем субтитры через ffmpeg (лучше качеством)
         # Для простоты используем TextClip (но ASS лучше)
@@ -270,7 +301,7 @@ class VideoComposer:
                 stroke_width=CONFIG.subtitle_outline_width,
                 method="caption",
                 size=(self.target_w - 80, None),
-                font="Arial"
+                font=_subtitle_font_path(CONFIG.subtitle_font_size),
             ).with_duration(rel_end - rel_start).with_start(max(0, rel_start))
 
             # Позиционирование
