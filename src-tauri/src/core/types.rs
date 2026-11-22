@@ -72,6 +72,16 @@ pub struct RenderSettings {
     pub subtitle_font: String,
     pub subtitle_size: i32,
     pub subtitle_color: String,
+    pub subtitle_language: String, // "auto", "ru", "en" — язык распознавания
+    pub translation_enabled: bool, // переводить ли субтитры
+    pub translation_target_lang: String, // "en", "es", "fr" и т.д.
+    pub translation_api_url: String, // URL API перевода (LibreTranslate)
+    pub translation_api_key: Option<String>,
+    pub dubbing_enabled: bool, // дублирование звука (TTS вместо оригинального аудио)
+    pub tts_api_url: String,   // URL TTS API (ElevenLabs и др.)
+    pub tts_api_key: Option<String>,
+    pub tts_voice: String, // идентификатор голоса
+    pub tts_model: String, // модель TTS
     pub banner: bool,
     pub banner_path: Option<String>,
     pub banner_opacity: f32,
@@ -88,6 +98,16 @@ impl Default for RenderSettings {
             subtitle_font: "Arial".to_string(),
             subtitle_size: 24,
             subtitle_color: "#FFFFFF".to_string(),
+            subtitle_language: "auto".to_string(),
+            translation_enabled: false,
+            translation_target_lang: "en".to_string(),
+            translation_api_url: "https://libretranslate.de/translate".to_string(),
+            translation_api_key: None,
+            dubbing_enabled: false,
+            tts_api_url: "https://api.elevenlabs.io/v1/text-to-speech/".to_string(),
+            tts_api_key: None,
+            tts_voice: "Rachel".to_string(),
+            tts_model: "eleven_multilingual_v2".to_string(),
             banner: false,
             banner_path: None,
             banner_opacity: 0.5,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './lib/store';
 import { VideoPreview } from './components/VideoPreview';
+import { SubtitlesPanel } from './components/SubtitlesPanel';
 import { Timeline } from './components/Timeline';
 import { SettingsPanel } from './components/SettingsPanel';
 import { RenderQueue } from './components/RenderQueue';
@@ -44,8 +45,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-surface text-slate-200 p-4 md:p-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 animate-fade-in">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-accent-dim flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.4)]">
+        <div className="glass-panel p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent-dim flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.4)]">
             <Monitor size={24} className="text-surface" />
           </div>
           <div>
@@ -56,7 +57,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleImportClick}
-            className="flex items-center gap-2 px-4 py-2 bg-surface hover:bg-surface-hover border border-slate-600 rounded-lg text-sm transition-all active:scale-95"
+            className="btn-secondary flex items-center gap-2"
           >
             <Film size={18} />
             <span className="hidden sm:inline">Импортировать видео</span>
@@ -105,9 +106,10 @@ export default function App() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Левая колонка — превью и анализ */}
+          {/* Левая колонка — превью, анализ и субтитры */}
           <div className="lg:col-span-5 space-y-6">
             <VideoPreview />
+            <SubtitlesPanel />
             <button
               onClick={() => {
                 // Анализ уже вызывается при загрузке; кнопка для повторного анализа

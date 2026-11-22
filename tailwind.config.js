@@ -23,6 +23,7 @@ export default {
       boxShadow: {
         glass: "0 8px 32px 0 rgba(0, 0, 0, 0.37)",
         card: "0 4px 20px -2px rgba(0, 0, 0, 0.4)",
+        glow: "0 0 40px -10px rgba(56, 189, 248, 0.25)",
       },
       backdropBlur: {
         xs: "2px",

@@ -27,6 +27,16 @@ export interface RenderSettings {
   subtitle_font: string;
   subtitle_size: number;
   subtitle_color: string;
+  subtitle_language: string;
+  translation_enabled: boolean;
+  translation_target_lang: string;
+  translation_api_url: string;
+  translation_api_key?: string | null;
+  dubbing_enabled: boolean;
+  tts_api_url: string;
+  tts_api_key?: string | null;
+  tts_voice: string;
+  tts_model: string;
   banner: boolean;
   banner_path?: string | null;
   banner_opacity: number;

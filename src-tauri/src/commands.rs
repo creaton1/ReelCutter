@@ -1,9 +1,56 @@
+use crate::core::subtitles::{generate_subtitles, SubtitleConfig, SubtitleSegment};
+use crate::core::translation::{TranslationConfig, Translator};
 use crate::core::types::*;
 use crate::db;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use uuid::Uuid;
+
+/// Запрос генерации субтитров (приходит из фронтенда).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateSubtitlesRequest {
+    pub video_path: String,
+    pub model_path: String,
+    pub language: String,
+    pub translate_to_en: bool,
+}
+
+/// Результат генерации субтитров.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateSubtitlesResponse {
+    pub segments: Vec<SubtitleSegment>,
+    pub output_path: String,
+}
+
+/// Запрос перевода субтитров.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TranslateSubtitlesRequest {
+    pub segments: Vec<SubtitleSegment>,
+    pub api_url: String,
+    pub api_key: Option<String>,
+    pub source_lang: String,
+    pub target_lang: String,
+}
+
+/// Запрос синтеза речи (TTS) для дублирования.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TtsSynthesizeRequest {
+    pub segments: Vec<SubtitleSegment>,
+    pub api_url: String,
+    pub api_key: Option<String>,
+    pub voice: String,
+    pub model: String,
+    pub output_dir: String,
+}
+
+/// Ответ синтеза речи.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TtsSynthesizeResponse {
+    pub combined_audio: String,
+    pub segments_count: usize,
+}
 
 #[tauri::command]
 pub fn init_app(db_path: String) -> Result<(), String> {
@@ -78,6 +125,8 @@ pub async fn render_clips_cmd(
     source: String,
     clips: Vec<ClipSegment>,
     settings: RenderSettings,
+    subtitle_segments: Option<Vec<SubtitleSegment>>,
+    dub_audio_path: Option<String>,
 ) -> Result<String, String> {
     let job = db::create_render_job(&project_id).map_err(|e| e.to_string())?;
     let job_id = job.id.clone();
@@ -88,6 +137,7 @@ pub async fn render_clips_cmd(
         let total = clips.len() as f64;
         let mut done = 0.0;
         let mut outputs: Vec<String> = Vec::new();
+        let subs = subtitle_segments.as_deref().unwrap_or(&[]);
 
         for clip in &clips {
             let preset = crate::core::types::PRESETS
@@ -95,7 +145,15 @@ pub async fn render_clips_cmd(
                 .find(|p| p.name == settings.preset)
                 .unwrap_or(&crate::core::types::PRESETS[1]);
             let out = format!("rendered_{}.mp4", Uuid::new_v4());
-            match crate::core::render::render_single_clip(&source, clip, preset, &settings, &out) {
+            match crate::core::render::render_single_clip(
+                &source,
+                clip,
+                preset,
+                &settings,
+                &out,
+                subs,
+                dub_audio_path.as_deref(),
+            ) {
                 Ok(_) => {
                     outputs.push(out.clone());
                     let mut c = clip.clone();
@@ -144,6 +202,78 @@ pub async fn render_clips_cmd(
 #[tauri::command]
 pub fn list_render_jobs_cmd(project_id: String) -> Result<Vec<db::RenderJob>, String> {
     db::list_render_jobs(&project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn generate_subtitles_cmd(
+    req: GenerateSubtitlesRequest,
+) -> Result<GenerateSubtitlesResponse, String> {
+    let config = SubtitleConfig {
+        model_path: req.model_path,
+        language: req.language,
+        translate_to_en: req.translate_to_en,
+        output_format: "srt".to_string(),
+    };
+    let result = generate_subtitles(&req.video_path, &config).map_err(|e| e.to_string())?;
+    Ok(GenerateSubtitlesResponse {
+        segments: result.segments,
+        output_path: result.output_path.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+pub fn translate_subtitles_cmd(
+    req: TranslateSubtitlesRequest,
+) -> Result<Vec<SubtitleSegment>, String> {
+    let config = TranslationConfig {
+        api_url: req.api_url,
+        api_key: req.api_key,
+        source_lang: req.source_lang,
+        target_lang: req.target_lang,
+    };
+    let translator = Translator::new(config);
+    translator
+        .translate_segments(&req.segments)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tts_synthesize_cmd(req: TtsSynthesizeRequest) -> Result<TtsSynthesizeResponse, String> {
+    let config = crate::core::tts::TtsConfig {
+        api_url: req.api_url,
+        api_key: req.api_key,
+        voice: req.voice,
+        model: req.model,
+        output_dir: PathBuf::from(&req.output_dir),
+    };
+    let client = crate::core::tts::TtsClient::new(config);
+
+    let mut tts_segments = Vec::new();
+    for (i, seg) in req.segments.iter().enumerate() {
+        let audio_path = client
+            .synthesize_segment(seg, i)
+            .map_err(|e| e.to_string())?;
+        tts_segments.push(crate::core::tts::TtsAudioSegment {
+            start: seg.start,
+            end: seg.end,
+            text: seg.text.clone(),
+            audio_path,
+        });
+    }
+
+    let clip_duration = req
+        .segments
+        .iter()
+        .map(|s| s.end - s.start)
+        .fold(0.0f64, f64::max);
+    let combined = client
+        .combine_audio(&tts_segments, clip_duration)
+        .map_err(|e| e.to_string())?;
+
+    Ok(TtsSynthesizeResponse {
+        combined_audio: combined.to_string_lossy().to_string(),
+        segments_count: tts_segments.len(),
+    })
 }
 
 #[tauri::command]

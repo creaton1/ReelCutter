@@ -1,5 +1,19 @@
-import { Settings, Image, Music, Subtitles } from 'lucide-react';
+import { Settings, Image, Music, Subtitles, Languages, Bot, Mic, Volume2 } from 'lucide-react';
 import { useStore } from '../lib/store';
+
+const SUBTITLE_LANGS = [
+  { value: 'auto', label: 'Авто-определение' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'en', label: 'English' },
+];
+
+const TRANSLATE_LANGS = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'zh', label: '中文' },
+];
 
 export const SettingsPanel = () => {
   const { settings, updateSettings } = useStore();
@@ -42,10 +56,17 @@ export const SettingsPanel = () => {
         <div className="grid grid-cols-2 gap-4">
           <ToggleRow
             label="Субтитры"
-            description="Авто-субтитры на клипах"
+            description="Авто-субтитры из речи (Whisper)"
             icon={<Subtitles size={16} />}
             checked={settings.subtitles}
             onChange={(e) => updateSettings({ subtitles: e.target.checked })}
+          />
+          <ToggleRow
+            label="Перевод субтитров"
+            description="Перевести на другой язык"
+            icon={<Languages size={16} />}
+            checked={settings.translation_enabled}
+            onChange={(e) => updateSettings({ translation_enabled: e.target.checked })}
           />
           <ToggleRow
             label="Баннер / логотип"
@@ -54,7 +75,130 @@ export const SettingsPanel = () => {
             checked={settings.banner}
             onChange={(e) => updateSettings({ banner: e.target.checked })}
           />
+          <ToggleRow
+            label="Дублирование звука (TTS)"
+            description="Озвучка переведённых субтитров вместо оригинала"
+            icon={<Mic size={16} />}
+            checked={settings.dubbing_enabled}
+            onChange={(e) => updateSettings({ dubbing_enabled: e.target.checked })}
+          />
         </div>
+
+        {/* Язык субтитров */}
+        <div>
+          <label className="label-text">Язык субтитров</label>
+          <select
+            value={settings.subtitle_language}
+            onChange={(e) => updateSettings({ subtitle_language: e.target.value })}
+            className="input-field"
+          >
+            {SUBTITLE_LANGS.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Настройки перевода */}
+        {settings.translation_enabled && (
+          <div className="space-y-3 p-3 bg-accent/10 rounded-lg border border-accent/30">
+            <div className="flex items-center gap-2 text-xs text-accent font-semibold uppercase tracking-wider mb-1">
+              <Bot size={14} />
+              <span>Перевод субтитров</span>
+            </div>
+            <div>
+              <label className="label-text">На какой язык</label>
+              <select
+                value={settings.translation_target_lang}
+                onChange={(e) =>
+                  updateSettings({ translation_target_lang: e.target.value })
+                }
+                className="input-field"
+              >
+                {TRANSLATE_LANGS.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label-text">URL API перевода</label>
+              <input
+                type="text"
+                value={settings.translation_api_url}
+                onChange={(e) =>
+                  updateSettings({ translation_api_url: e.target.value })
+                }
+                className="input-field"
+                placeholder="https://libretranslate.de/translate"
+              />
+            </div>
+            <div>
+              <label className="label-text">API ключ (опционально)</label>
+              <input
+                type="text"
+                value={settings.translation_api_key ?? ''}
+                onChange={(e) =>
+                  updateSettings({ translation_api_key: e.target.value || null })
+                }
+                className="input-field"
+                placeholder="Bearer token"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Настройки дублирования (TTS) */}
+        {settings.dubbing_enabled && (
+          <div className="space-y-3 p-3 bg-accent/10 rounded-lg border border-accent/30">
+            <div className="flex items-center gap-2 text-xs text-accent font-semibold uppercase tracking-wider mb-1">
+              <Volume2 size={14} />
+              <span>Озвучка (TTS)</span>
+            </div>
+            <div>
+              <label className="label-text">Голос</label>
+              <input
+                type="text"
+                value={settings.tts_voice}
+                onChange={(e) => updateSettings({ tts_voice: e.target.value })}
+                className="input-field"
+                placeholder="Rachel"
+              />
+            </div>
+            <div>
+              <label className="label-text">Модель TTS</label>
+              <input
+                type="text"
+                value={settings.tts_model}
+                onChange={(e) => updateSettings({ tts_model: e.target.value })}
+                className="input-field"
+                placeholder="eleven_multilingual_v2"
+              />
+            </div>
+            <div>
+              <label className="label-text">URL TTS API</label>
+              <input
+                type="text"
+                value={settings.tts_api_url}
+                onChange={(e) => updateSettings({ tts_api_url: e.target.value })}
+                className="input-field"
+                placeholder="https://api.elevenlabs.io/v1/text-to-speech/VOICE_ID"
+              />
+            </div>
+            <div>
+              <label className="label-text">API ключ TTS (опционально)</label>
+              <input
+                type="text"
+                value={settings.tts_api_key ?? ''}
+                onChange={(e) => updateSettings({ tts_api_key: e.target.value || null })}
+                className="input-field"
+                placeholder="Bearer token"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Настройки субтитров */}
         <div className="space-y-3">

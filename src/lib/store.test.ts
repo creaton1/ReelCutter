@@ -7,6 +7,8 @@ const mInvoke = vi.hoisted(() => ({
   initApp: vi.fn(() => Promise.resolve()),
   probeVideo: vi.fn(() => Promise.resolve()),
   detectHighlights: vi.fn(() => Promise.resolve([])),
+  generateSubtitles: vi.fn(() => Promise.resolve({ segments: [], output_path: '' })),
+  translateSubtitles: vi.fn(() => Promise.resolve([])),
   createProject: vi.fn(() =>
     Promise.resolve({ id: 'p-1', name: 'Test', source_path: 's.mp4', preset: 'Shorts', created_at: '', updated_at: '' })
   ),
@@ -20,6 +22,8 @@ const mInvoke = vi.hoisted(() => ({
 vi.mock('./tauri', () => ({
   probeVideo: mInvoke.probeVideo,
   detectHighlights: mInvoke.detectHighlights,
+  generateSubtitles: mInvoke.generateSubtitles,
+  translateSubtitles: mInvoke.translateSubtitles,
   createProject: mInvoke.createProject,
   listProjects: mInvoke.listProjects,
   saveClips: mInvoke.saveClips,
@@ -35,6 +39,16 @@ const initialSettings: RenderSettings = {
   subtitle_font: 'Arial',
   subtitle_size: 24,
   subtitle_color: '#FFFFFF',
+  subtitle_language: 'auto',
+  translation_enabled: false,
+  translation_target_lang: 'en',
+  translation_api_url: 'https://libretranslate.de/translate',
+  translation_api_key: null,
+  dubbing_enabled: false,
+  tts_api_url: 'https://api.elevenlabs.io/v1/text-to-speech/',
+  tts_api_key: null,
+  tts_voice: 'Rachel',
+  tts_model: 'eleven_multilingual_v2',
   banner: false,
   banner_path: null,
   banner_opacity: 0.5,
@@ -56,6 +70,11 @@ function resetStore() {
     activeProjectId: null,
     isRendering: false,
     renderProgress: 0,
+    subtitleSegments: [],
+    subtitleStatus: 'idle',
+    subtitleError: null,
+    translationStatus: 'idle',
+    translationError: null,
   });
 }
 

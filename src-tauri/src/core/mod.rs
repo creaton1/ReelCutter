@@ -2,6 +2,9 @@ pub mod analyzer;
 pub mod detect;
 pub mod ffmpeg;
 pub mod render;
+pub mod subtitles;
+pub mod translation;
+pub mod tts;
 pub mod types;
 
 use crate::core::render::render_single_clip;
@@ -157,7 +160,7 @@ pub fn render_clips(
         .par_iter()
         .map(|clip| {
             let out = format!("rendered_{}.mp4", clip.id);
-            render_single_clip(source, clip, preset, settings, &out)?;
+            render_single_clip(source, clip, preset, settings, &out, &[], None)?;
             Ok(out)
         })
         .collect();
